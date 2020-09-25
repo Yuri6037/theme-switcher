@@ -15,3 +15,4 @@ gtk-extras = { git = "https://github.com/pop-os/gtk-extras" }
 glib = "0.9.3"
 gtk = "0.8.1"
 gio = "0.8.1"
+json = "0.12.4"

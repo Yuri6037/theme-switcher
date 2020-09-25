@@ -10,6 +10,9 @@ use gtk_extras::{
 use std::cell::Cell;
 use std::rc::Rc;
 use std::ops::Deref;
+use std::fs;
+use std::string::String;
+use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug)]
 enum ThemeVariant {
@@ -17,17 +20,67 @@ enum ThemeVariant {
     Slim,
 }
 
-#[derive(Clone, Copy, Debug)]
-enum ThemeSelection {
-    Light,
-    Dark,
-}
-
 pub const DARK: u8 = 0b01;
 pub const SLIM: u8 = 0b10;
 
-pub const SCREENSHOT_DARK: &str = env!("SCREENSHOT_DARK");
-pub const SCREENSHOT_LIGHT: &str = env!("SCREENSHOT_LIGHT");
+struct ThemeDescriptor {
+    name: String,
+    display_name: String,
+    preview: String,
+    gedit_theme: Option<String>
+}
+
+fn read_theme_descriptor<'a>(theme: &str) -> Option<ThemeDescriptor> {
+    let mut buf: PathBuf = [r"/", "usr", "share", "themes", theme].iter().collect();
+    buf.set_extension("json");
+    let res = fs::read_to_string(buf);
+    if res.is_err() {
+        return None;
+    }
+    let s = res.unwrap();
+    let jres = json::parse(&s);
+    if jres.is_err() {
+        return None;
+    }
+    let j = jres.unwrap();
+    return Some(ThemeDescriptor {
+        name: String::from(theme),
+        display_name: String::from(j["Name"].as_str().unwrap()),
+        preview: String::from(j["Preview"].as_str().unwrap()),
+        gedit_theme: Some(String::from(j["GEditTheme"].as_str().unwrap()))
+    });
+}
+
+fn gen_theme_list() -> Vec<ThemeDescriptor> {
+    let mut vec: Vec<ThemeDescriptor> = Vec::new();
+    let paths = fs::read_dir("/usr/share/themes").unwrap();
+    for path in paths {
+        let mothefuckingbullshitlanguage = path.unwrap().path();
+        let mut buf = PathBuf::from(mothefuckingbullshitlanguage.clone());
+        buf.push("index.theme");
+        if !buf.exists() {
+            continue;
+        }
+        let so = mothefuckingbullshitlanguage.file_name();
+        let file_name: <str as ToOwned>::Owned;
+        let desc: ThemeDescriptor;
+        match so {
+            Some(s) => file_name = s.to_string_lossy().into_owned(),
+            None => continue
+        }
+        match read_theme_descriptor(&file_name) {
+            Some(d) => desc = d,
+            None => desc = ThemeDescriptor {
+                name: file_name.clone(),
+                display_name: file_name.clone(),
+                preview: String::from("/usr/share/icons/pop-os-branding/pop_icon.svg"),
+                gedit_theme: None
+            }
+        }
+        vec.push(desc);
+    }
+    return vec;
+}
 
 pub struct PopThemeSwitcher(gtk::Container);
 
@@ -35,29 +88,24 @@ impl PopThemeSwitcher {
     pub fn new() -> Self {
         let gpe = GeditPreferencesEditor::new_checked();
         let gdi = GnomeDesktopInterface::new();
+        let mut vec: Vec<SelectionVariant<usize>> = Vec::new();
+        let themes = gen_theme_list();
 
         let variants = {
             let current_theme = gdi.gtk_theme();
             let current_theme = current_theme.as_ref().map_or("", |s| s.as_str());
 
-            let dark_mode = current_theme.contains("dark");
+            for i in 0..themes.len() {
+                vec.push(SelectionVariant {
+                    name:         &themes[i].display_name,
+                    image:        Some(&themes[i].preview),
+                    size_request: None,
+                    active:       current_theme == &themes[i].name,
+                    event:        i
+                });
+            }
 
-            [
-                SelectionVariant {
-                    name:         "Light",
-                    image:        Some(SCREENSHOT_LIGHT),
-                    size_request: None,
-                    active:       !dark_mode,
-                    event:        ThemeSelection::Light,
-                },
-                SelectionVariant {
-                    name:         "Dark",
-                    image:        Some(SCREENSHOT_DARK),
-                    size_request: None,
-                    active:       dark_mode,
-                    event:        ThemeSelection::Dark,
-                },
-            ]
+            &vec[..]
         };
 
         let (tx, rx) = glib::MainContext::channel(glib::PRIORITY_DEFAULT);
@@ -75,7 +123,7 @@ impl PopThemeSwitcher {
 
         let selection = cascade! {
             ImageSelection::new(&variants, "", handler);
-            ..set_max_children_per_line(2);
+            ..set_max_children_per_line(3);
             ..set_min_children_per_line(2);
             ..set_column_spacing(24);
             ..set_row_spacing(24);
@@ -84,16 +132,14 @@ impl PopThemeSwitcher {
 
         selection_ready.set(true);
         rx.attach(None, move |event| {
-            let (gtk_theme, gedit_scheme) = match event {
-                ThemeSelection::Light => ("Pop", "pop-light"),
-                ThemeSelection::Dark => ("Pop-dark", "pop-dark"),
-            };
-
+            let theme = &themes[event];
             if let Some(gpe) = gpe.as_ref() {
-                gpe.set_scheme(gedit_scheme);
+                if theme.gedit_theme.is_some() {
+                    let motherfucker = theme.gedit_theme.as_ref();
+                    gpe.set_scheme(motherfucker.unwrap());
+                }
             }
-            gdi.set_gtk_theme(gtk_theme);
-
+            gdi.set_gtk_theme(&theme.name);
             glib::Continue(true)
         });
 

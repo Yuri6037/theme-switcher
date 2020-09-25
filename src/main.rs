@@ -7,6 +7,17 @@ use pop_theme_switcher::PopThemeSwitcher;
 
 pub const APP_ID: &str = "com.system76.PopThemeSwitcher";
 
+fn create_container() -> gtk::ScrolledWindow {
+    let container = PopThemeSwitcher::new();
+
+    let scroll = gtk::ScrolledWindow::new(gtk::NONE_ADJUSTMENT, gtk::NONE_ADJUSTMENT);
+    scroll.add(&*container);
+    scroll.set_hexpand(true);
+    scroll.set_vexpand(true);
+
+    return scroll;
+}
+
 fn main() {
     glib::set_program_name(APP_ID.into());
     gtk::init().expect("failed to init GTK");
@@ -22,8 +33,8 @@ fn main() {
     application.connect_startup(|app| {
         let widget = cascade! {
             gtk::Box::new(gtk::Orientation::Vertical, 12);
-            ..add(&*cascade! {
-                PopThemeSwitcher::new();
+            ..add(&cascade! {
+                create_container();
                 ..set_border_width(12);
             });
             // ..add(&cascade! {
