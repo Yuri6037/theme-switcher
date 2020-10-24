@@ -1,6 +1,6 @@
 {
   "Name": "Pop Light Exclusive",
-  "Preview": "/usr/lib/theme-switcher/light.svg",
   "GEditTheme": "pop-light",
-  "ShellTheme": "Pop-full-light"
+  "ShellTheme": "Pop-full-light",
+  "Preview": "/usr/share/themes/light.svg"
 }
