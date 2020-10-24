@@ -85,7 +85,7 @@ fn gen_theme_list() -> Vec<ThemeDescriptor> {
                 display_name: file_name.clone(),
                 preview: String::from("/usr/share/icons/pop-os-branding/pop_icon.svg"),
                 gedit_theme: None,
-                shell_theme: None
+                shell_theme: Some(file_name.clone())
             }
         }
         vec.push(desc);
