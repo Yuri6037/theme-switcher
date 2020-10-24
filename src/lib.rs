@@ -13,6 +13,7 @@ use std::ops::Deref;
 use std::fs;
 use std::string::String;
 use std::path::PathBuf;
+use gio::{Settings, SettingsExt};
 
 #[derive(Clone, Copy, Debug)]
 enum ThemeVariant {
@@ -27,7 +28,15 @@ struct ThemeDescriptor {
     name: String,
     display_name: String,
     preview: String,
-    gedit_theme: Option<String>
+    gedit_theme: Option<String>,
+    shell_theme: Option<String>
+}
+
+fn str_to_string(s: Option<&str>) -> Option<String> {
+    match s {
+        Some(v) => return Some(String::from(v)),
+        None => return None
+    }
 }
 
 fn read_theme_descriptor<'a>(theme: &str) -> Option<ThemeDescriptor> {
@@ -47,7 +56,8 @@ fn read_theme_descriptor<'a>(theme: &str) -> Option<ThemeDescriptor> {
         name: String::from(theme),
         display_name: String::from(j["Name"].as_str().unwrap()),
         preview: String::from(j["Preview"].as_str().unwrap()),
-        gedit_theme: Some(String::from(j["GEditTheme"].as_str().unwrap()))
+        gedit_theme: str_to_string(j["GEditTheme"].as_str()),
+        shell_theme: str_to_string(j["ShellTheme"].as_str())
     });
 }
 
@@ -74,7 +84,8 @@ fn gen_theme_list() -> Vec<ThemeDescriptor> {
                 name: file_name.clone(),
                 display_name: file_name.clone(),
                 preview: String::from("/usr/share/icons/pop-os-branding/pop_icon.svg"),
-                gedit_theme: None
+                gedit_theme: None,
+                shell_theme: None
             }
         }
         vec.push(desc);
@@ -86,6 +97,7 @@ pub struct PopThemeSwitcher(gtk::Container);
 
 impl PopThemeSwitcher {
     pub fn new() -> Self {
+        let shell = Settings::new("org.gnome.shell.extensions.user-theme");
         let gpe = GeditPreferencesEditor::new_checked();
         let gdi = GnomeDesktopInterface::new();
         let mut vec: Vec<SelectionVariant<usize>> = Vec::new();
@@ -134,9 +146,14 @@ impl PopThemeSwitcher {
         rx.attach(None, move |event| {
             let theme = &themes[event];
             if let Some(gpe) = gpe.as_ref() {
-                if theme.gedit_theme.is_some() {
-                    let motherfucker = theme.gedit_theme.as_ref();
-                    gpe.set_scheme(motherfucker.unwrap());
+                if let Some(gedit_theme) = theme.gedit_theme.as_ref() {
+                    gpe.set_scheme(gedit_theme);
+                }
+            }
+            if let Some(shell_theme) = theme.shell_theme.as_ref() { //This will only work if user shell theme extension is installed
+                match shell.set_string("name", shell_theme) {
+                    Ok(_) => Settings::sync(),
+                    Err(v) => print!("Error setting shell theme {}\n", v)
                 }
             }
             gdi.set_gtk_theme(&theme.name);
