@@ -13,6 +13,7 @@ use std::ops::Deref;
 use std::fs;
 use std::string::String;
 use std::path::PathBuf;
+use std::path::Path;
 use gio::{Settings, SettingsExt};
 
 #[derive(Clone, Copy, Debug)]
@@ -39,8 +40,8 @@ fn str_to_string(s: Option<&str>) -> Option<String> {
     }
 }
 
-fn read_theme_descriptor<'a>(theme: &str) -> Option<ThemeDescriptor> {
-    let mut buf: PathBuf = [r"/", "usr", "share", "themes", theme].iter().collect();
+fn read_theme_descriptor<'a>(path: &Path, theme: &str) -> Option<ThemeDescriptor> {
+    let mut buf: PathBuf = [path, Path::new(theme)].iter().collect();
     buf.set_extension("json");
     let res = fs::read_to_string(buf);
     if res.is_err() {
@@ -61,9 +62,9 @@ fn read_theme_descriptor<'a>(theme: &str) -> Option<ThemeDescriptor> {
     });
 }
 
-fn gen_theme_list() -> Vec<ThemeDescriptor> {
+fn gen_theme_list_path(path1: &Path) -> Vec<ThemeDescriptor> {
     let mut vec: Vec<ThemeDescriptor> = Vec::new();
-    let paths = fs::read_dir("/usr/share/themes").unwrap();
+    let paths = fs::read_dir(path1).unwrap();
     for path in paths {
         let mothefuckingbullshitlanguage = path.unwrap().path();
         let mut buf = PathBuf::from(mothefuckingbullshitlanguage.clone());
@@ -78,7 +79,7 @@ fn gen_theme_list() -> Vec<ThemeDescriptor> {
             Some(s) => file_name = s.to_string_lossy().into_owned(),
             None => continue
         }
-        match read_theme_descriptor(&file_name) {
+        match read_theme_descriptor(&path1, &file_name) {
             Some(d) => desc = d,
             None => desc = ThemeDescriptor {
                 name: file_name.clone(),
@@ -91,6 +92,19 @@ fn gen_theme_list() -> Vec<ThemeDescriptor> {
         vec.push(desc);
     }
     return vec;
+}
+
+fn gen_theme_list() -> Vec<ThemeDescriptor> {
+    let mut v = Vec::new();
+    let mut useless = gen_theme_list_path(Path::new("/usr/share/themes"));
+    v.append(&mut useless);
+    if let Some(mut path) = dirs::home_dir()
+    {
+        path.push(".themes");
+        let mut useless1 = gen_theme_list_path(&path);
+        v.append(&mut useless1);
+    }
+    return v;
 }
 
 pub struct PopThemeSwitcher(gtk::Container);
